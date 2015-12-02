@@ -1,0 +1,139 @@
+Characterization test
+http://en.wikipedia.org/wiki/Characterization_test
+
+Cleaning PrimePrinter code (from literateProgramming) Uncle Bob examples
+
+1 - Copiamos el codigo tal y como viene de legacy code y le añadimos un caso test.
+El caso de test se basa en comparar linea a linea 
+ - el fichero "gold", previamente generado como resultado de la salida por consola del codigo
+ - el fichero "lead" generado durante el propio test.
+
+Todo el test se lleva a cabo en el bucle while de PrimePrinterTest.makeSureOutputMatchesGold().
+Todo Ok.
+Nota: Tuve que elminar el segundo assert "assertEquals(null, lead.readLine())" sino el test falla.
+
+Commit "Starting - Initial case with no changes"
+
+2 - Todo el codigo esta en una sola funcion "main"
+ - main() -> Refactoring - Extract Method Object ->PrimePrinterHelper() 
+
+ - Ahora todo ese codigo se invoca desde el main como "PrimePrinterHelper.invoke()"
+ - Quita el static a "invoke" siendo por tanto necesario instanciar "PrimePrinterHelper"
+ - Testeamos de nuevo -> OK
+ - Transforma "PrimePrinterHelper" de inner class a outer class
+ - Cambio los modificadores de acceso para
+   - PrimePrinterHelper: no private no static
+   - PrimePrinterHelper.invoke(): no private
+ - Test: Ok.
+ - Renombramos las variables y se pasa a variables de clase:
+   - M -> numbersOfPrimes
+   - RR -> linesPerPages
+   - CC -> columns
+   - ORDMAX -> ordmax
+   - P[] -> primes[]
+   - PAGENUMBER -> pagenumber
+   - PAGEOFFSET -> pageoffset
+   - ROWOFFSET -> rowoffset
+   - C -> colum (colum to be printed)
+   - J -> candidate (prime number)
+   - K -> primeIndex (prime number)
+   - JPRIME -> possiblyPrime (prime number)
+   - ORD -> ord
+   - SQUARE -> square
+   - N -> n // Este parace que no se usa.
+   - MULT[] -> multiples
+
+ - Borro "final int WW = 10;" pues no se usaba en ningun lado
+ - TEST: OK
+
+ - 3 Empezamos a extraer metodos desde el metodos main. Basicamente hay 2 partes
+   - Generar el array de primos
+   - (lineas 38 - 58) Imprimir el array de primos. Lo extraigo en "printNumbers". Ademas inyecto por parametros de entrada lo que tiene que imprimir: printNumbers(int[]primes, int numbersOfPrimes). De esta forma exmpiezo a reducir el acomplamiento desde metodo con su clase, preparandome asi para una posterior refactorizacion (metodo -> clase)
+   - Test: OK
+ - 4. Mejora SRP 
+   - Limpieza de nombres: printNumbers(int[]primes, int numbersOfPrimes) -> printNumbers(int[]numbers, int numbersOfNumbers)
+   -Solucion Violacion SRP: No tiene sentido imprimir los numeros en el mismo sitio que se generan. Para arreglarlo
+      - Saco la llamado de impresion de primos "printNumbers(primes, numbersOfPrimes);". La declaro como "public para poder invocarla desde el exterior. 
+      - Y hago que el metodo invoke() devuelva el array de primos generado ( return primes y cambio signature void invoke() -> int[] invoke())
+      - Y en el main recojo los primos devueltos por invoke y los paso a la llamada de printNumbers(primes, numbersOfPrimes);
+      - Misc: Declara "private static final int numbersOfPrimes = 1000" en "class PrimePrinter"
+
+   * Test: OK
+   * commit: Improving SRP invoke by moving printing numbers to main
+
+ - 5. Limpiando nombres.
+   - Mejorando nombre primePrinterHelper.invoke() -> primePrinterHelper.generatePrimes()
+
+   * commit: "Cleaning: primePrinterHelper.invoke() -> primePrinterHelper.generatePrimes()"
+
+ - 6. Extract method printNumbers to class NumberPrinter.
+   - Refactoring method to method object.
+
+   * Test: OK
+   * commit: "Extract method printNumbers to class NumberPrinter"
+
+ - 7. NumberPrinter from inner class to outer class.
+   - inner to outer class, pero hay que arreglar los campos privados.
+      - pagenumber, pageoffset, rowoffset, colum se convierten en parametros locales del metodo NumberPrinter.invoke()
+      - int linesPerPages, int columns, pasan a ser parametros del contructor de NumberPrinter
+      - Modificar la creacion de instancia para NumberPrinter en PrimePrinterHelper.printNumber()
+
+   * Test: OK
+   * commit: "NumberPrinter from inner class to outer class"
+
+ - 8. Better names
+      - NumberPrinter.invoke()-> NumberPrinter.print()
+        - NumberPrinter(linesPerPages, columns, numbers, numbersOfNumbers).print(); ->
+        - new NumberPrinter(linesPerPages, columns).print(numbers, numbersOfNumbers); (Mejoro el numero de argumentos). 
+        - Y reajustamos los parametros del constructor y del metodo print.
+
+   * Test: OK
+   * commit: "NumberPrinter: Improving arguments methods"
+
+ - 9. Moving new NumberPrinter(linesPerPages, columns).print(numbers, numbersOfNumbers);
+      - to: PrimePrinter.main()
+      - Y tengo que preparar sus parametros poniendo como campos de PrimePrinter
+         -     private static final int linesPerPages = 50;
+         -     private static final int columns = 4;
+      - Y los paramatros de la llamada de print:
+         -     print(numbers, numbersOfNumbers); -> print(primes, numbersOfPrimes);
+
+   * Test: OK
+   * commit: "PrimePrinterHelper.printNumbers(): Extract code directly to PrimePrinter.main()"
+
+ - 10. Cleaning code
+      - PrimePrinterHelper: eliminamos variables ya no necesarias: linesPerPages, columns, pagenumber, pageoffset, rowoffset, colum.
+      - Renaming PrimePrinterHelper -> PrimeGenerator.
+      - Generalizamos el metodo PrimePrinterHelper.generatePrimes() para que trabaje con un numero de primos parametrizado:
+         - Ya no necesito private final int numbersOfPrimes = 1000; como var de la clase PrimeGenerator
+         - Y tengo que cambiar la instanciacion del array "primes" desde la clase al metodo "generatePrimes"
+
+   * Test: OK
+   * commit: "Improving PrimePrinterHelper -> PrimeGenerator"
+
+ - 10. Improving while/do inside PrimeGenerator.generatePrimes
+      - Refactor: extract code while/do -> findNextPrime()
+
+   * Test: OK
+   * commit: "Improving while/do inside PrimeGenerator.generatePrimes -> findNextPrime()"
+
+ - 11. Mejora PrimePrinter.main()
+      - primePrinterHelper: Separamos instanciacion y llamada metodo print()
+      - Y reordenamos: instanciaciones juntas, y depues invocaciones de metodos.
+
+   + Creacion carpeta "docs": 
+      - creacion de diagramas inicial y final de clases:
+         - PrimeGenerator.main-Class-Initial.png 
+         - PrimeGenerator-Class-End, PrimeGenerator.main-Secuence-End
+      - traslado de este doc de notas a esta carpeta.
+
+   * Test: OK
+   * commit: "Improving PrimePrinter.main() and docs"
+
+ - 12. Empezamos a refactorizar NumberPrinter.print()
+      - Reducimos el codigo mediante extraccion de metodos.
+
+   * Test: OK
+   * commit: "Improving NumberPrinter.print()-1"
+
+
